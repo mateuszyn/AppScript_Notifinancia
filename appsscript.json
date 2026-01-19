@@ -1,0 +1,15 @@
+{
+  "timeZone": "America/Sao_Paulo",
+  "dependencies": {},
+  "exceptionLogging": "CLOUD",
+  "runtimeVersion": "V8",
+  "webapp": {
+    "executeAs": "USER_ACCESSING",
+    "access": "ANYONE"
+  },
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/script.send_mail"
+  ]
+}

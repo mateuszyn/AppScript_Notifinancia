@@ -1,0 +1,586 @@
+// EM JavaScript.html (Código Completo)
+
+// ==========================================================
+// PASSO 2: TODAS AS FUNÇÕES E LÓGICA DO APP
+// ==========================================================
+
+// --- Seleção de Elementos DOM ---
+const notificationToggle = document.getElementById('notification-toggle-switch');const notificationStatusSpan = document.getElementById('notification-save-status');
+const statusDiv = document.getElementById('status');
+const loadingSpinnerSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="spinner"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>`;
+const addAssetModal = document.getElementById('add-asset-modal');
+const openModalBtn = document.getElementById('show-add-form-btn');
+const closeModalBtn = document.getElementById('close-modal-btn');
+const verifyTickerBtn = document.getElementById('verify-ticker-btn');
+const confirmAddBtn = document.getElementById('confirm-add-asset-btn');
+const step1 = document.getElementById('modal-step-1');
+const step2 = document.getElementById('modal-step-2');
+const tickerInput = document.getElementById('modal-ticker-input');
+const qtdInput = document.getElementById('modal-qtd-input');
+const pmInput = document.getElementById('modal-pm-input');
+const actionModal = document.getElementById('action-modal');
+const tickerErrorMessage = document.getElementById('ticker-error-message');
+const qrCodeModal = document.getElementById('qr-code-modal');
+const qrCodeDiv = document.getElementById('qrcode');
+const closeQrModalBtn = document.getElementById('close-qr-modal-btn');
+const qrCodeFooter = document.getElementById('qr-modal-footer');
+const qrModalTitle = document.getElementById('qr-modal-title');
+const qrModalInstructions = document.getElementById('qr-modal-instructions');
+let qrcode = null;
+let estadoAtualNotificacoes;
+
+// --- Funções de Visualização e UI ---
+function updateBrokerVisuals() {
+  const selector = document.getElementById('broker-selector');
+  const selectedBrokerName = selector.value;
+  const broker = brokers.find(b => b.name === selectedBrokerName);
+  if (!broker) return;
+
+  const operateButtons = document.querySelectorAll('.btn-operate');
+  operateButtons.forEach(btn => {
+    const label = btn.querySelector('span');
+    if (label) {
+      label.textContent = broker.name;
+    }
+    btn.style.backgroundColor = broker.color;
+    btn.style.color = broker.textColor || '#FFFFFF';
+  });
+
+  selector.style.backgroundColor = broker.color;
+  selector.style.color = broker.textColor || '#FFFFFF';
+  selector.style.borderColor = broker.color;
+}
+
+function goToBroker(ticker) {
+  const selectedBrokerName = document.getElementById('broker-selector').value;
+  const broker = brokers.find(b => b.name === selectedBrokerName);
+  if (!broker) {
+    showToastNotification('Corretora não encontrada.', 'warning');
+    return;
+  }
+  const modal = document.getElementById('action-modal');
+  const title = modal.querySelector('#action-modal-title');
+  const body = modal.querySelector('#action-modal-body');
+  const footer = modal.querySelector('#action-modal-footer');
+  title.textContent = `Operar na ${broker.name}`;
+  body.innerHTML = `<p style="text-align: center;">Escolha como deseja prosseguir:</p>`;
+  footer.innerHTML = '';
+  const btnApp = document.createElement('button');
+  btnApp.textContent = 'Ir para o App (Play Store)';
+  btnApp.className = 'btn-submit btn-outline btn-green';
+  btnApp.onclick = () => {
+    window.open(broker.appUrl, '_blank');
+    modal.style.display = 'none';
+  };
+  footer.appendChild(btnApp);
+  if (broker.type === 'web') {
+    const btnWeb = document.createElement('button');
+    btnWeb.textContent = 'Ir para o Home Broker';
+    btnWeb.className = 'btn-submit btn-broker-web';
+    btnWeb.style.color = broker.color;
+    btnWeb.style.borderColor = broker.color;
+    btnWeb.addEventListener('mouseover', () => {
+      btnWeb.style.backgroundColor = broker.color;
+      btnWeb.style.color = broker.textColor || '#FFFFFF';
+    });
+    btnWeb.addEventListener('mouseout', () => {
+      btnWeb.style.backgroundColor = 'white';
+      btnWeb.style.color = broker.color;
+    });
+    btnWeb.onclick = () => {
+      window.open(broker.webUrl, '_blank');
+      modal.style.display = 'none';
+    };
+    footer.appendChild(btnWeb);
+  }
+  modal.querySelector('#close-action-modal-btn').onclick = () => modal.style.display = 'none';
+  modal.style.display = 'flex';
+}
+
+function mostrarInfoTotal() {
+  const modal = document.getElementById('action-modal');
+  const title = modal.querySelector('#action-modal-title');
+  const body = modal.querySelector('#action-modal-body');
+  const footer = modal.querySelector('#action-modal-footer');
+  const closeBtnX = modal.querySelector('#close-action-modal-btn'); // Seleciona o botão X
+
+  title.textContent = "Sobre o Cálculo do Total";
+  
+  body.innerHTML = `
+    <div style="text-align: left; line-height: 1.5; color: #555;">
+      <p>O valor <b>Total</b> exibido no card é uma estimativa do seu capital investido neste ativo.</p>
+      <p style="margin-top: 10px;"><b>Fórmula utilizada:</b><br>
+      <code style="background: #eee; padding: 2px 5px; border-radius: 3px;">Quantidade × Preço Médio</code></p>
+      <p style="margin-top: 10px; font-size: 13px; font-style: italic;">
+        * Este valor pode ter pequenas divergências caso existam taxas de corretagem não inclusas no seu preço médio.
+      </p>
+    </div>
+  `;
+
+  // Define a função de fechar para o botão "X"
+  if (closeBtnX) {
+    closeBtnX.onclick = () => modal.style.display = 'none';
+  }
+
+  footer.innerHTML = '';
+  const btnClose = document.createElement('button');
+  btnClose.textContent = 'Entendi';
+  btnClose.className = 'btn-submit btn-filled';
+  btnClose.onclick = () => modal.style.display = 'none';
+  
+  footer.appendChild(btnClose);
+  modal.style.display = 'flex';
+}
+
+function showToastNotification(message, type = 'success') {
+  statusDiv.innerHTML = '';
+  if (type === 'success') { statusDiv.style.backgroundColor = '#d4edda'; statusDiv.style.color = '#155724'; } 
+  else if (type === 'warning') { statusDiv.style.backgroundColor = '#fff3cd'; statusDiv.style.color = '#664d03'; }
+  else if (type === 'info') { statusDiv.style.backgroundColor = '#cce5ff'; statusDiv.style.color = '#004085'; }
+  const textContainer = document.createElement('div');
+  textContainer.style.textAlign = 'center';
+  const pMsg = document.createElement('p');
+  pMsg.textContent = message;
+  pMsg.style.margin = '0';
+  pMsg.style.fontWeight = 'bold';
+  textContainer.appendChild(pMsg);
+  if (type === 'success') {
+    const pInfo = document.createElement('p');
+    pInfo.textContent = 'Reinicie a página para ver as atualizações.';
+    pInfo.style.margin = '4px 0 0 0';
+    pInfo.style.fontSize = '12px';
+    textContainer.appendChild(pInfo);
+  }
+  statusDiv.appendChild(textContainer);
+  statusDiv.style.display = 'block';
+  setTimeout(() => { statusDiv.style.display = 'none'; }, 7000);
+}
+
+function resetModal() {
+  step1.style.display = 'block';
+  step2.style.display = 'none';
+  tickerInput.value = '';
+  qtdInput.value = '';
+  pmInput.value = '';
+  verifyTickerBtn.disabled = false;
+  verifyTickerBtn.textContent = 'Verificar Ativo';
+  tickerErrorMessage.style.display = 'none';
+}
+
+function closeModal() {
+  addAssetModal.style.display = 'none';
+}
+
+/**
+ * Adiciona um valor ao campo de input numérico especificado.
+ * Agora suporta tanto inteiros (Quantidade) quanto decimais (Total).
+ * @param {number} amount - A quantidade a ser somada.
+ * @param {string} inputId - O ID do elemento input a ser modificado.
+ */
+function addToInput(amount, inputId) {
+  const input = document.getElementById(inputId);
+  if (input) {
+    // Usa parseFloat para lidar com decimais e .replace para formatos BRL (123,45)
+    let currentValue = parseFloat(String(input.value).replace(',', '.')) || 0;
+    let newValue = currentValue + amount;
+
+    // Se o input for de "step 0.01" (dinheiro), formata com 2 casas
+    if (input.step === '0.01') {
+      input.value = newValue.toFixed(2);
+    } else {
+      input.value = newValue; // Para quantidade, mantém inteiro
+    }
+    input.focus();
+  }
+}
+
+// --- Funções CRUD (Editar, Excluir) ---
+function editar(ticker, tipo) {
+  const modal = document.getElementById('action-modal');
+  const title = modal.querySelector('#action-modal-title');
+  const body = modal.querySelector('#action-modal-body');
+  const footer = modal.querySelector('#action-modal-footer');
+
+  const label = tipo === 'quantidade' ? 'Quantidade' : 'Preço Médio';
+  const targetElementId = (tipo === 'quantidade' ? 'qtd_' : 'pm_') + ticker;
+  const valorAtual = document.getElementById(targetElementId).innerText;
+
+  title.textContent = `Editar ${label} de ${ticker}`;
+
+  let bodyHTML = '';
+  if (tipo === 'quantidade') {
+    bodyHTML = `
+      <label for="modal-edit-input-qtd">Nova Quantidade:</label>
+      <div class="input-wrapper">
+        <input type="number" id="modal-edit-input-qtd" value="${valorAtual.replace(',', '.')}" step="1">
+        <div class="mini-btn-group">
+          <button type="button" class="mini-btn" onclick="addToInput(1, 'modal-edit-input-qtd')">+1</button>
+          <button type="button" class="mini-btn" onclick="addToInput(10, 'modal-edit-input-qtd')">+10</button>
+          <button type="button" class="mini-btn" onclick="addToInput(100, 'modal-edit-input-qtd')">+100</button>
+        </div>
+      </div>
+    `;
+  } else {
+    bodyHTML = `
+      <label for="modal-edit-input-pm">Novo Preço Médio:</label>
+      <input type="number" id="modal-edit-input-pm" value="${valorAtual.replace(',', '.')}" step="0.01">
+    `;
+  }
+
+  body.innerHTML = bodyHTML;
+  footer.innerHTML = ''; 
+
+  const btnSave = document.createElement('button');
+  btnSave.textContent = 'Salvar Alteração';
+  btnSave.className = 'btn-submit btn-outline btn-green';
+  btnSave.onclick = () => {
+    let novaQtd = null;
+    let novoPM = null;
+
+    if (tipo === 'quantidade') {
+      novaQtd = document.getElementById('modal-edit-input-qtd').value;
+      if (novaQtd === '') { alert('Digite um valor.'); return; }
+    } else {
+      novoPM = document.getElementById('modal-edit-input-pm').value;
+      if (novoPM === '') { alert('Digite um valor.'); return; }
+    }
+
+    modal.style.display = 'none';
+    const targetEl = document.getElementById(targetElementId);
+    if (targetEl) targetEl.innerHTML = loadingSpinnerSVG;
+
+    google.script.run
+      .withSuccessHandler(function(msg) {
+        showToastNotification(msg, 'success');
+      })
+      .withFailureHandler(function(error) {
+        showToastNotification('Erro: ' + error.message, 'warning');
+      })
+      .atualizarAtivoManualmente(ticker, novaQtd, novoPM, null); // Enviamos null para o Total
+  };
+
+  const btnCancel = document.createElement('button');
+  btnCancel.textContent = 'Cancelar';
+  btnCancel.className = 'btn-submit btn-outline';
+  btnCancel.onclick = () => modal.style.display = 'none';
+
+  footer.appendChild(btnCancel);
+  footer.appendChild(btnSave);
+  modal.style.display = 'flex';
+}
+
+function excluirAtivoJs(ticker) {
+  const modal = document.getElementById('action-modal');
+  const title = modal.querySelector('#action-modal-title');
+  const body = modal.querySelector('#action-modal-body');
+  const footer = modal.querySelector('#action-modal-footer');
+  title.textContent = 'Confirmar Exclusão';
+  body.innerHTML = `<p>Tem certeza que deseja excluir o ativo <strong>${ticker}</strong>? Esta ação não pode ser desfeita.</p>`;
+  footer.innerHTML = '';
+  const btnConfirm = document.createElement('button');
+  btnConfirm.textContent = 'Sim, Excluir';
+  btnConfirm.className = 'btn-submit btn-outline btn-red';
+  btnConfirm.onclick = () => {
+    modal.style.display = 'none';
+    const targetCard = document.querySelector(`.asset-card[data-ticker="${ticker}"]`);
+    if (targetCard) {
+      targetCard.style.cssText = 'text-align: center; padding: 20px;';
+      targetCard.innerHTML = loadingSpinnerSVG + ' Excluindo...';
+    }
+    google.script.run
+      .withSuccessHandler(response => {
+        if (response.success) {
+          showToastNotification(response.message, 'success');
+        } else {
+          showToastNotification(response.message, 'warning');
+          setTimeout(() => window.top.location.reload(true), 2000);
+        }
+      })
+      .withFailureHandler(error => {
+        showToastNotification('Erro ao excluir: ' + error.message, 'warning');
+        setTimeout(() => window.top.location.reload(true), 2000);
+      })
+      .excluirAtivo(ticker);
+  };
+  
+  const btnCancel = document.createElement('button');
+  btnCancel.textContent = 'Cancelar';
+  btnCancel.className = 'btn-submit btn-outline';
+  btnCancel.onclick = () => modal.style.display = 'none';
+  footer.appendChild(btnCancel);
+  footer.appendChild(btnConfirm);
+  actionModal.querySelector('#close-action-modal-btn').onclick = () => modal.style.display = 'none';
+  actionModal.style.display = 'flex';
+}
+
+// Função para atualizar a aparência do TOGGLE de notificações
+function atualizarToggleNotificacao() {
+    if (typeof estadoAtualNotificacoes === 'undefined') {
+        console.warn("ATUALIZAR_TOGGLE: estadoAtualNotificacoes indefinido!"); // Log B
+        return; 
+    }
+    if (!notificationToggle) { // Verifica se o elemento existe
+        console.error("ATUALIZAR_TOGGLE: Elemento notificationToggle não encontrado!"); // Log B.1
+        return;
+    }
+
+    try {
+        if (estadoAtualNotificacoes) { // Deve ser true agora
+            notificationToggle.classList.add('on');
+            notificationToggle.setAttribute('aria-checked', 'true');
+        } else {
+            notificationToggle.classList.remove('on');
+            notificationToggle.setAttribute('aria-checked', 'false');
+        }
+
+        notificationToggle.classList.remove('disabled'); 
+
+    } catch (innerError) {
+        console.error("ATUALIZAR_TOGGLE: ERRO INTERNO DURANTE ATUALIZAÇÃO!", innerError); // Log I (Erro aqui?)
+    }
+}
+
+// --- Event Listeners dos Modais e Autocomplete ---
+openModalBtn.addEventListener('click', () => { resetModal(); addAssetModal.style.display = 'flex'; tickerInput.focus(); });
+closeModalBtn.addEventListener('click', closeModal);
+addAssetModal.addEventListener('click', (event) => { if (event.target === addAssetModal) closeModal(); });
+
+verifyTickerBtn.addEventListener('click', () => {
+  const ticker = tickerInput.value;
+  if (!ticker) {
+    tickerErrorMessage.textContent = 'Por favor, digite um ticker.';
+    tickerErrorMessage.style.display = 'block';
+    return;
+  }
+  tickerErrorMessage.style.display = 'none';
+  verifyTickerBtn.disabled = true;
+  verifyTickerBtn.textContent = 'Verificando...';
+  google.script.run
+    .withSuccessHandler(response => {
+      verifyTickerBtn.disabled = false;
+      verifyTickerBtn.textContent = 'Verificar Ativo';
+      if (response.success) {
+        pmInput.value = response.price;
+        step1.style.display = 'none';
+        step2.style.display = 'block';
+        qtdInput.focus();
+      } else {
+        tickerErrorMessage.textContent = response.error;
+        tickerErrorMessage.style.display = 'block';
+      }
+    })
+    .withFailureHandler(error => {
+      verifyTickerBtn.disabled = false;
+      verifyTickerBtn.textContent = 'Verificar Ativo';
+      tickerErrorMessage.textContent = 'Erro de comunicação. Tente novamente.';
+      tickerErrorMessage.style.display = 'block';
+    })
+    .getSingleTickerPrice(ticker);
+});
+
+confirmAddBtn.addEventListener('click', () => {
+  const ticker = tickerInput.value.toUpperCase().trim();
+  const qtd = qtdInput.value;
+  const pm = pmInput.value;
+
+  if (!ticker || !qtd || !pm) {
+    showToastNotification('Por favor, preencha todos os campos.', 'warning');
+    return;
+  }
+
+  // 1. Feedback Visual: Cria o card de carregamento na grade
+  const placeholderCard = document.createElement('div');
+  placeholderCard.className = 'asset-card';
+  placeholderCard.id = 'placeholder-card';
+  placeholderCard.style.cssText = 'opacity: 0.7; text-align: center; padding: 20px; grid-column: 1 / -1; border: 2px dashed #ccc;';
+  placeholderCard.innerHTML = loadingSpinnerSVG + `<br>Salvando ${ticker}...`;
+  document.getElementById('asset-grid').appendChild(placeholderCard);
+
+  closeModal();
+
+  // 2. Chamada ao Servidor: Identifica o usuário logado e salva na aba correta
+  google.script.run
+    .withSuccessHandler(response => {
+      const cardToRemove = document.getElementById('placeholder-card');
+      
+      if (response && response.success) {
+        // Altera o card temporário para uma mensagem de sucesso estática
+        if (cardToRemove) {
+          cardToRemove.style.backgroundColor = '#d4edda';
+          cardToRemove.style.color = '#155724';
+          cardToRemove.innerHTML = `<strong>✓ ${ticker} salvo!</strong><br>Recarregue a página para ver os dados atualizados.`;
+        }
+        
+        // Exibe um alerta persistente para o usuário
+        showToastNotification('Ativo salvo com sucesso! Por favor, atualize a página (F5).', 'success');
+      } else {
+        if (cardToRemove) cardToRemove.remove();
+        const msg = (response && response.message) ? response.message : "Erro desconhecido";
+        showToastNotification('Erro: ' + msg, 'warning');
+      }
+    })
+    .withFailureHandler(error => {
+      showToastNotification('Erro crítico: ' + error.message, 'warning');
+      const cardToRemove = document.getElementById('placeholder-card');
+      if (cardToRemove) cardToRemove.remove();
+    })
+    .adicionarAtivo(ticker, qtd, pm); // Executa no contexto do usuário atual
+});
+
+const autocompleteContainer = document.querySelector('.autocomplete');
+const suggestionsList = document.createElement('div');
+suggestionsList.setAttribute('class', 'autocomplete-items');
+autocompleteContainer.appendChild(suggestionsList);
+tickerInput.addEventListener('input', function() {
+  const value = this.value;
+  suggestionsList.innerHTML = '';
+  if (!value) return;
+  const suggestions = allAvailableTickers.filter(ticker =>
+    ticker.substr(0, value.length).toUpperCase() === value.toUpperCase()
+  );
+  suggestions.slice(0, 10).forEach(suggestion => {
+    const suggestionItem = document.createElement('div');
+    suggestionItem.innerHTML = `<strong>${suggestion.substr(0, value.length)}</strong>${suggestion.substr(value.length)}`;
+    suggestionItem.addEventListener('click', function() {
+      tickerInput.value = suggestion;
+      suggestionsList.innerHTML = '';
+    });
+    suggestionsList.appendChild(suggestionItem);
+  });
+});
+document.addEventListener('click', function (e) {
+  if (e.target !== tickerInput) {
+    suggestionsList.innerHTML = '';
+  }
+});
+
+// --- Listener de Inicialização da Página ---
+document.addEventListener('DOMContentLoaded', (event) => {
+  const brokerSelector = document.getElementById('broker-selector');
+  brokers.forEach(broker => {
+    const option = document.createElement('option');
+    option.value = broker.name;
+    option.textContent = broker.name;
+    option.style.backgroundColor = broker.color;
+    option.style.color = 'white';
+    option.style.fontWeight = 'bold';
+    brokerSelector.appendChild(option);
+  });
+  if (defaultBroker && brokerSelector.querySelector(`option[value="${defaultBroker}"]`)) {
+    brokerSelector.value = defaultBroker;
+  }
+  updateBrokerVisuals();
+  // DENTRO DO document.addEventListener('DOMContentLoaded', ...)
+
+// --- Lógica de Ordenação ---
+const sortSelect = document.getElementById('sort-select');
+
+// Marca a opção de ordenação atual que veio do servidor
+if (currentSort && sortSelect.querySelector(`option[value="${currentSort}"]`)) {
+    sortSelect.value = currentSort;
+}
+
+// Adiciona o listener para SALVAR e AVISAR o usuário
+sortSelect.addEventListener('change', function() {
+    const newSortValue = this.value;
+    const statusSpan = document.getElementById('sort-save-status');
+
+    // Mostra "Salvando..."
+    statusSpan.innerHTML = loadingSpinnerSVG + ' Salvando...';
+    statusSpan.style.color = 'green'; // Garante cor verde
+
+    // 1. Chama o servidor para salvar a nova preferência
+    google.script.run
+        .withSuccessHandler(function(response) {
+            // 2. QUANDO SUCESSO, avisa o usuário para atualizar
+            statusSpan.innerHTML = '✓ Salvo! Atualize a página.'; 
+
+            // Opcional: Limpa a mensagem após alguns segundos
+            setTimeout(() => { statusSpan.innerHTML = ''; }, 4000); 
+        })
+        .withFailureHandler(function(error) {
+            // Em caso de erro, avisa o usuário
+            statusSpan.innerHTML = "Erro ao salvar!";
+            statusSpan.style.color = 'red';
+            console.error("Erro ao salvar ordenação:", error); 
+            // Opcional: Limpa a mensagem de erro após alguns segundos
+             setTimeout(() => { statusSpan.innerHTML = ''; statusSpan.style.color = 'green'; }, 4000);
+        })
+        .salvarOrdenacaoPadrao(newSortValue);
+});
+
+  brokerSelector.addEventListener('change', function() {
+    updateBrokerVisuals();
+    const selectedBroker = this.value;
+    const statusSpan = document.getElementById('broker-save-status');
+    statusSpan.innerHTML = loadingSpinnerSVG;
+    google.script.run
+      .withSuccessHandler(response => {
+        statusSpan.innerHTML = '✓ Salvo!';
+        setTimeout(() => { statusSpan.innerHTML = ''; }, 2500);
+      })
+      .withFailureHandler(error => {
+        statusSpan.innerHTML = 'Erro!';
+        statusSpan.style.color = 'red';
+        setTimeout(() => { statusSpan.innerHTML = ''; statusSpan.style.color = 'green'; }, 2500);
+      })
+      .salvarCorretoraPadrao(selectedBroker);
+  });
+
+  // --- Inicialização e Listener do Botão de Notificações ---
+
+// Define a variável no escopo do DOMContentLoaded usando o valor injetado
+estadoAtualNotificacoes = typeof notificacoesAtivas !== 'undefined' ? notificacoesAtivas : false; 
+
+// Define o estado inicial do botão
+atualizarToggleNotificacao(); 
+
+// Adiciona o listener de clique ao TOGGLE
+notificationToggle.addEventListener('click', function() {
+    // Impede múltiplos cliques enquanto salva
+    if (notificationToggle.classList.contains('disabled')) {
+        return; 
+    }
+
+
+    const novoEstado = !estadoAtualNotificacoes; 
+
+    notificationStatusSpan.innerHTML = loadingSpinnerSVG + ' Salvando...';
+    notificationStatusSpan.style.color = 'green';
+    notificationToggle.classList.add('disabled'); 
+
+
+    google.script.run
+        .withSuccessHandler(function(respostaServidor) {
+            estadoAtualNotificacoes = (respostaServidor === 'SIM'); 
+            atualizarToggleNotificacao(); 
+            notificationStatusSpan.innerHTML = '✓ Salvo!';
+            setTimeout(() => { notificationStatusSpan.innerHTML = ''; }, 2500);
+        })
+        .withFailureHandler(function(error) {
+            console.error("Erro ao salvar notificação:", error); // Log para depuração
+            notificationStatusSpan.innerHTML = 'Erro!';
+            notificationStatusSpan.style.color = 'red';
+            notificationToggle.classList.remove('disabled'); 
+            setTimeout(() => { notificationStatusSpan.innerHTML = ''; notificationStatusSpan.style.color = 'green'; }, 3000);
+        })
+        .salvarPreferenciaNotificacao(novoEstado); 
+});
+
+}); //fim do DOMContentLoaded
+
+/**
+ * Salva a preferência de ordenação do usuário na aba Configurações.
+ * @param {string} sortValue O valor da ordenação (ex: "varDia_desc").
+ * @returns {string} Uma mensagem de sucesso.
+ */
+function salvarOrdenacaoPadrao(sortValue) {
+  try {
+    // Assume que a configuração está na célula B3, com base na chave A3
+    const configSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Configurações');
+    configSheet.getRange('B3').setValue(sortValue);
+    return `Ordenação salva como ${sortValue}.`;
+  } catch (e) {
+    throw new Error(`Erro ao salvar ordenação: ${e.message}`);
+  }
+}

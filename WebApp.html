@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+  <style>
+    <?!= HtmlService.createHtmlOutputFromFile('Estilos').getContent(); ?>
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header-controls">
+      <h1>NOTIFINANCIA: Dashboard</h1>
+
+      <div class="notification-toggle" style="display: flex; align-items: center; gap: 10px;"> 
+
+          <label for="notification-toggle-switch" style="font-weight: bold; white-space: nowrap;">Notificações às 18h:</label> 
+
+          <div id="notification-toggle-switch" class="toggle-switch" role="switch" aria-checked="false" tabindex="0"> <span class="toggle-thumb"></span> 
+              <span class="toggle-label-on">ON</span>
+              <span class="toggle-label-off">OFF</span>
+          </div>
+
+          <span id="notification-save-status" style="font-size: 12px; color: green; margin-left: 5px;"></span> 
+
+      </div>
+
+        <div class="sort-controls">
+        <label for="sort-select" style="font-weight: bold; white-space: nowrap;">Ordenar por:</label>
+        <select id="sort-select" style="min-width: 180px;">
+        <option value="ticker_asc">Nome (A-Z)</option>
+        <option value="ticker_desc">Nome (Z-A)</option>
+
+        <option value="variacaoDia_desc">Variação Dia (Maior %)</option> 
+        <option value="variacaoDia_asc">Variação Dia (Menor %)</option>
+        <option value="variacaoPM_desc">Variação P.M. (Maior %)</option> 
+        <option value="variacaoPM_asc">Variação P.M. (Menor %)</option>
+
+        <option value="investimentoTotal_desc">Valor Total (Maior R$)</option>
+        <option value="investimentoTotal_asc">Valor Total (Menor R$)</option>
+        <option value="quantidade_desc">Quantidade (Maior)</option>
+        <option value="quantidade_asc">Quantidade (Menor)</option>
+  </select>
+    <span id="sort-save-status" style="font-size: 12px; color: green; margin-left: 10px;"></span>
+</div>
+      <div class="broker-selector-group">
+        <label for="broker-selector">Corretora Padrão:</label>
+        <select id="broker-selector"></select>
+        <span id="broker-save-status" style="font-size: 12px; color: green;"></span>
+      </div>
+    </div>
+    
+    <div id="asset-grid" class="asset-grid">
+      <? for (var i = 0; i < ativos.length; i++) {  
+          var varPM = ativos[i].variacaoPM;
+          var varDia = ativos[i].variacaoDia;
+          var cardStatusClass = '';
+          if (varPM > 0 && varDia > 0) { cardStatusClass = 'card-success-strong'; } 
+          else if (varPM > 0) { cardStatusClass = 'card-success-light'; } 
+          else if (varPM < 0) { cardStatusClass = 'card-danger'; }
+          var varPMClass = varPM >= 0 ? 'text-green' : 'text-red';
+          var varDiaClass = varDia >= 0 ? 'text-green' : 'text-red';
+      ?>
+      <div class="asset-card <?= cardStatusClass ?>" data-ticker="<?= ativos[i].ticker ?>">
+        <div class="card-row">
+          <div class="flex-grow card-value"><b><?= ativos[i].ticker ?></b></div>
+          <div class="card-label" style="font-size: 1.1em;">Ativo</div>
+        </div>
+        <div class="card-row">
+          <div class="flex-grow">
+            <div class="card-label">Detalhes</div>
+            <div class="card-value card-value-small">
+              Qtd: <span id="qtd_<?= ativos[i].ticker ?>"><?= ativos[i].quantidade ?></span><br>
+              Total <span class="info-icon" onclick="mostrarInfoTotal()" title="">?</span> <span class="approx-symbol">≈</span>
+              R$ <span id="total_<?= ativos[i].ticker ?>"><?= ativos[i].investimentoTotal.toFixed(2).replace('.', ',') ?></span>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <span class="edit-icon" onclick="editar('<?= ativos[i].ticker ?>', 'quantidade')"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 1em; height: 1em;"><path d="M14.06 9.06L14.94 8.18C15.35 7.77 16.01 7.77 16.42 8.18L17.82 9.58C18.23 9.99 18.23 10.65 17.82 11.06L17.06 11.82M14.06 9.06L5.94 17.18C5.53 17.59 5.53 18.25 5.94 18.66L7.34 20.06C7.75 20.47 8.41 20.47 8.82 20.06L17.06 11.82M14.06 9.06L17.06 11.82" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="delete-icon" onclick="excluirAtivoJs('<?= ativos[i].ticker ?>')"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2-2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></span>
+          </div>
+        </div>
+        <div class="card-row">
+          <div class="flex-grow">
+            <div class="card-label">Preço Médio (% vs Atual)</div>
+            <div class="card-value">
+              R$ <span id="pm_<?= ativos[i].ticker ?>"><?= ativos[i].precoMedio.toFixed(2) ?></span>
+              <span class="<?= varPMClass ?>">(<?= ativos[i].variacaoPM.toFixed(2) ?>%)</span>
+            </div>
+          </div>
+          <div>
+            <span class="edit-icon" onclick="editar('<?= ativos[i].ticker ?>', 'pm')"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 1em; height: 1em;"><path d="M14.06 9.06L14.94 8.18C15.35 7.77 16.01 7.77 16.42 8.18L17.82 9.58C18.23 9.99 18.23 10.65 17.82 11.06L17.06 11.82M14.06 9.06L5.94 17.18C5.53 17.59 5.53 18.25 5.94 18.66L7.34 20.06C7.75 20.47 8.41 20.47 8.82 20.06L17.06 11.82M14.06 9.06L17.06 11.82" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </div>
+        </div>
+        <div class="card-row">
+          <div class="flex-grow">
+            <div class="card-label">Preço Atual (% Dia)</div>
+            <div class="card-value">
+              R$ <span id="atual_<?= ativos[i].ticker ?>"><?= ativos[i].precoAtual ?></span>
+              <span class="<?= varDiaClass ?>">(<?= ativos[i].variacaoDia.toFixed(2) ?>%)</span>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn-operate" onclick="goToBroker('<?= ativos[i].ticker ?>')">Operar</button>
+      </div>
+      <? } ?>
+    </div>
+    <div class="add-asset-container">
+      <button type="button" id="show-add-form-btn" class="btn-add-asset">＋ Adicionar Novo Ativo</button>
+    </div>
+    <div id="status"></div>
+  </div>
+  
+  <div id="add-asset-modal" class="modal-overlay" style="display: none;"><div class="modal-content"><span id="close-modal-btn" class="close-btn">&times;</span><h2>Adicionar Novo Ativo</h2><div id="modal-step-1"><div class="modal-form"><label>Ticker:</label><div class="autocomplete"><input type="text" id="modal-ticker-input" placeholder="Digite o ticker..." autocomplete="off"></div><div id="ticker-error-message" class="error-message" style="display: none;"></div></div><div class="modal-footer"><button type="button" id="verify-ticker-btn" class="btn-submit btn-outline btn-green">Verificar Ativo</button></div></div><div id="modal-step-2" style="display: none;"><div class="modal-form"><label>Quantidade Comprada:</label><div class="input-wrapper"><input type="number" id="modal-qtd-input" min="0" placeholder="0" step="1"><div class="mini-btn-group"><button type="button" class="mini-btn" onclick="addToInput(10, 'modal-qtd-input')">+10</button><button type="button" class="mini-btn" onclick="addToInput(100, 'modal-qtd-input')">+100</button><button type="button" class="mini-btn" onclick="addToInput(1000, 'modal-qtd-input')">+1000</button></div></div><label>Preço Médio de Compra:</label><input type="number" id="modal-pm-input" min="0" step="0.01" placeholder="0.00"></div><div class="modal-footer"><button type="button" id="confirm-add-asset-btn" class="btn-submit btn-outline btn-green">Salvar Ativo</button></div></div></div></div>
+  <div id="action-modal" class="modal-overlay" style="display: none;"><div class="modal-content"><span id="close-action-modal-btn" class="close-btn">&times;</span><h2 id="action-modal-title"></h2><div id="action-modal-body" class="modal-form"></div><div id="action-modal-footer" class="modal-footer"></div></div></div>
+  <div id="qr-code-modal" class="modal-overlay" style="display: none;"><div class="modal-content" style="text-align: center;"><span id="close-qr-modal-btn" class="close-btn">&times;</span><h3 id="qr-modal-title"></h3><div id="qrcode" style="padding: 10px; background: white;"></div><p id="qr-modal-instructions" style="font-size: 12px; color: #555; margin-top: 15px;"></p><div id="qr-modal-footer" class="modal-footer"></div></div></div>
+
+  <script>
+    // ==========================================================================
+    // PASSO 1: INJEÇÃO DE DADOS DO SERVIDOR
+    // Estas variáveis são preenchidas pelo Apps Script e ficam disponíveis
+    // globalmente para o script que será incluído abaixo.
+    // ==========================================================================
+    const brokers = JSON.parse('<?= brokers ?>');
+    const allAvailableTickers = JSON.parse(<?= allTickers ?>);
+    const defaultBroker = "<?= defaultBroker ?>";
+    // DENTRO DO <script> de WebApp.html
+    const notificacoesAtivas = <?= notificacoesAtivas ?>;
+
+    const currentSort = "<?= currentSort ?>"; // Pega a ordenação atual do servidor
+
+    // ==========================================================================
+    // PASSO 2: INCLUSÃO DO CÓDIGO JAVASCRIPT PRINCIPAL
+    // O conteúdo de JavaScript.html é colado aqui e usará as variáveis acima.
+    // ==========================================================================
+    <?!= HtmlService.createHtmlOutputFromFile('JavaScript').getContent(); ?>
+  </script>
+</body>
+</html>
